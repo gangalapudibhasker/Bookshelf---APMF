@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOOKSHELF - APMF | Andhra Pradesh Mathematics Forum</title>
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Official Mathematics digital bookshelf by Andhra Pradesh Mathematics Forum (APMF). Access Telugu and English medium Math textbooks for Classes 6 to 12.">
+    <meta name="keywords" content="APMF, Andhra Pradesh Mathematics Forum, Math Books, SCERT Math Textbooks, Class 6 Math, Class 10 Math, Intermediate Math, AP SCERT">
+    <meta name="author" content="APMF">
+    
+    <!-- Favicon / Shortcut Icon -->
+    <link rel="shortcut icon" type="image/png" href="logo.png">
+    
+    <!-- Google Fonts: Outfit (Heading) & Inter (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Proactive inline error handler for logo image defined early -->
+    <script>
+        function handleLogoError() {
+            var img = document.getElementById('apmf-logo-img');
+            var svg = document.getElementById('apmf-logo-svg');
+            if (img) img.style.display = 'none';
+            if (svg) svg.style.display = 'block';
+        }
+        function handleFooterLogoError() {
+            var img = document.getElementById('apmf-footer-logo-img');
+            var svg = document.getElementById('apmf-footer-logo-svg');
+            if (img) img.style.display = 'none';
+            if (svg) svg.style.display = 'block';
+        }
+    </script>
+</head>
+<body class="light-mode">
+    <!-- Math Geometric Overlay Background -->
+    <div class="math-bg-grid"></div>
+
+    <!-- Sticky Header -->
+    <header class="main-header">
+        <div class="header-container">
+            <div class="logo-brand">
+                <div class="logo-wrapper">
+                    <!-- Standard logo image that loads if present, with error handling triggering the inline SVG fallback -->
+                    <img src="logo.png" alt="APMF Logo" id="apmf-logo-img" class="brand-logo-img" onerror="handleLogoError()">
+                    
+                    <!-- Highly precise SVG reconstruction of the APMF logo as standard fallback -->
+                    <svg id="apmf-logo-svg" class="brand-logo-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <clipPath id="hex-clip">
+                                <polygon points="60,10 103,35 103,85 60,110 17,85 17,35" />
+                            </clipPath>
+                        </defs>
+                        <!-- Hexagon Outlines & Colorful Segment Blades -->
+                        <g clip-path="url(#hex-clip)">
+                            <!-- Top / Dark Slate Blade -->
+                            <polygon points="60,60 60,0 110,30 110,60" fill="#374151" />
+                            <!-- Top Right / Pink Magenta Blade -->
+                            <polygon points="60,60 110,30 110,90 60,90" fill="#db2777" />
+                            <!-- Bottom Right / Blue Blade -->
+                            <polygon points="60,60 110,90 60,120 30,90" fill="#2563eb" />
+                            <!-- Bottom / Green Blade -->
+                            <polygon points="60,60 60,120 10,90 10,60" fill="#16a34a" />
+                            <!-- Bottom Left / Red-Orange Blade -->
+                            <polygon points="60,60 10,60 10,0 60,30" fill="#dc2626" />
+                            <!-- Top Left / Orange Yellow Blade -->
+                            <polygon points="60,60 10,30 60,0 110,0" fill="#ea580c" />
+                        </g>
+                        <!-- Inner White Hexagon -->
+                        <polygon points="60,25 90,42.5 90,77.5 60,95 30,77.5 30,42.5" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+                        
+                        <!-- Logo Center APMF Design -->
+                        <!-- Left Blue Circle Accent -->
+                        <circle cx="48" cy="58" r="16" fill="#0f172a" />
+                        <!-- Right Purple Circle outline Accent -->
+                        <circle cx="68" cy="62" r="17" fill="none" stroke="#a78bfa" stroke-width="4" />
+                        
+                        <!-- Text Elements matching the branding -->
+                        <text x="48" y="63" font-family="'Outfit', sans-serif" font-weight="700" font-size="10" fill="#ffffff" text-anchor="middle">AP</text>
+                        <text x="60" y="64" font-family="'Outfit', sans-serif" font-weight="700" font-size="12" fill="#0f172a" text-anchor="middle">M</text>
+                        <text x="70" y="66" font-family="'Outfit', sans-serif" font-weight="700" font-size="11" fill="#1e1b4b" text-anchor="middle">F</text>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title-row">
+                        <h1 class="brand-title">BOOKSHELF – APMF</h1>
+                        <span class="brand-divider">|</span>
+                        <span class="brand-tagline">
+                            <span class="math-accent-icon"><i class="fa-solid fa-compass-drafting"></i></span>
+                            Mathematics Digital Repository
+                        </span>
+                    </div>
+                    <p class="brand-subtitle">Access official Telugu & English Medium Mathematics textbooks from Class 6 to 12.</p>
+                </div>
+            </div>
+            
+            <!-- Header Search Option -->
+            <div class="header-search-container">
+                <div class="search-bar-wrapper">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="book-search-input" placeholder="Search textbooks..." autocomplete="off">
+                    <button id="clear-search-btn" class="clear-btn" style="display: none;"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle-btn" class="icon-btn" aria-label="Toggle dark mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="content-wrapper">
+
+        <!-- Navigation Tabs for Classes 6-12 -->
+        <nav class="class-navigation-tabs">
+            <div class="tabs-scroll-container">
+                <button class="class-tab active" data-class="all">
+                    <span class="tab-label">All Books</span>
+                    <span class="tab-count" id="count-all">0</span>
+                </button>
+                <button class="class-tab" data-class="6">
+                    <span class="tab-label">Class 6</span>
+                    <span class="tab-count" id="count-6">0</span>
+                </button>
+                <button class="class-tab" data-class="7">
+                    <span class="tab-label">Class 7</span>
+                    <span class="tab-count" id="count-7">0</span>
+                </button>
+                <button class="class-tab" data-class="8">
+                    <span class="tab-label">Class 8</span>
+                    <span class="tab-count" id="count-8">0</span>
+                </button>
+                <button class="class-tab" data-class="9">
+                    <span class="tab-label">Class 9</span>
+                    <span class="tab-count" id="count-9">0</span>
+                </button>
+                <button class="class-tab" data-class="10">
+                    <span class="tab-label">Class 10</span>
+                    <span class="tab-count" id="count-10">0</span>
+                </button>
+                <button class="class-tab" data-class="11">
+                    <span class="tab-label">Class 11</span>
+                    <span class="tab-count" id="count-11">0</span>
+                </button>
+                <button class="class-tab" data-class="12">
+                    <span class="tab-label">Class 12</span>
+                    <span class="tab-count" id="count-12">0</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Books Grid Section -->
+        <section class="books-display-section">
+            <div class="section-header">
+                <h3 id="current-section-title">All Mathematics Textbooks</h3>
+                <span class="section-indicator" id="results-indicator">Showing all items</span>
+            </div>
+
+            <!-- Empty State -->
+            <div id="no-books-empty-state" class="empty-state" style="display: none;">
+                <div class="empty-icon"><i class="fa-solid fa-book-open"></i></div>
+                <h4>No Textbooks Found</h4>
+                <p>We couldn't find any books matching your search query. Try adjusting your search term or select another class tab.</p>
+                <button id="reset-filters-btn" class="btn btn-primary">Reset Filters</button>
+            </div>
+
+            <!-- Grid Container -->
+            <div class="books-grid" id="books-grid-container">
+                <!-- Cards dynamically generated via JavaScript -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer Area -->
+    <footer class="main-footer">
+        <div class="footer-container">
+            <div class="footer-logo-section">
+                <div class="footer-brand-container">
+                    <div class="logo-wrapper footer-logo-wrapper">
+                        <!-- Standard logo image that loads if present -->
+                        <img src="logo.png" alt="APMF Logo" id="apmf-footer-logo-img" class="brand-logo-img" onerror="handleFooterLogoError()">
+                        
+                        <!-- Highly precise SVG reconstruction of the APMF logo as standard fallback -->
+                        <svg id="apmf-footer-logo-svg" class="brand-logo-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <clipPath id="hex-clip-footer">
+                                    <polygon points="60,10 103,35 103,85 60,110 17,85 17,35" />
+                                </clipPath>
+                            </defs>
+                            <!-- Hexagon Outlines & Colorful Segment Blades -->
+                            <g clip-path="url(#hex-clip-footer)">
+                                <!-- Top / Dark Slate Blade -->
+                                <polygon points="60,60 60,0 110,30 110,60" fill="#374151" />
+                                <!-- Top Right / Pink Magenta Blade -->
+                                <polygon points="60,60 110,30 110,90 60,90" fill="#db2777" />
+                                <!-- Bottom Right / Blue Blade -->
+                                <polygon points="60,60 110,90 60,120 30,90" fill="#2563eb" />
+                                <!-- Bottom / Green Blade -->
+                                <polygon points="60,60 60,120 10,90 10,60" fill="#16a34a" />
+                                <!-- Bottom Left / Red-Orange Blade -->
+                                <polygon points="60,60 10,60 10,0 60,30" fill="#dc2626" />
+                                <!-- Top Left / Orange Yellow Blade -->
+                                <polygon points="60,60 10,30 60,0 110,0" fill="#ea580c" />
+                            </g>
+                            <!-- Inner White Hexagon -->
+                            <polygon points="60,25 90,42.5 90,77.5 60,95 30,77.5 30,42.5" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+                            
+                            <!-- Logo Center APMF Design -->
+                            <!-- Left Blue Circle Accent -->
+                            <circle cx="48" cy="58" r="16" fill="#0f172a" />
+                            <!-- Right Purple Circle outline Accent -->
+                            <circle cx="68" cy="62" r="17" fill="none" stroke="#a78bfa" stroke-width="4" />
+                            
+                            <!-- Text Elements matching the branding -->
+                            <text x="48" y="63" font-family="'Outfit', sans-serif" font-weight="700" font-size="10" fill="#ffffff" text-anchor="middle">AP</text>
+                            <text x="60" y="64" font-family="'Outfit', sans-serif" font-weight="700" font-size="12" fill="#0f172a" text-anchor="middle">M</text>
+                            <text x="70" y="66" font-family="'Outfit', sans-serif" font-weight="700" font-size="11" fill="#1e1b4b" text-anchor="middle">F</text>
+                        </svg>
+                    </div>
+                    <div class="footer-brand-info">
+                        <h4>Andhra Pradesh Mathematics Forum</h4>
+                        <p>© 2026 APMF Bookshelf. Empowering educators and students with high-quality math resources.</p>
+                        <p class="president-info">
+                            <span class="pres-name">GANGALAPUDI BHASKER REDDY</span>, 
+                            <span class="pres-title">APMF STATE PRESIDENT</span>, 
+                            <a href="https://wa.me/918555079452" target="_blank" class="pres-phone">
+                                <i class="fa-brands fa-whatsapp"></i> 8555079452
+                            </a> (Whatsapp message only)
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="footer-links">
+                    <a href="#" id="footer-admin-link" class="admin-discreet-link"><i class="fa-solid fa-lock"></i> Admin Login</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="admin-login-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card modal-small">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-lock-open"></i> Admin Authentication</h3>
+                <button class="close-modal-btn" onclick="closeAdminLoginModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="admin-login-form">
+                    <div class="form-group">
+                        <label for="admin-passcode">Enter Admin Passcode</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="admin-passcode" placeholder="••••••••" required autocomplete="current-password">
+                            <button type="button" id="toggle-passcode-visibility" class="view-password-btn"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                        <p class="form-help-text">Authorized members only. Enter passcode to access the bookshelf editor.</p>
+                        <div id="login-error-msg" class="error-banner" style="display: none;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Incorrect passcode. Please try again.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Authenticate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN DASHBOARD MODAL -->
+    <div id="admin-dashboard-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <div class="modal-title-wrapper">
+                    <h3><i class="fa-solid fa-sliders"></i> APMF Bookshelf Administrator Panel</h3>
+                    <span class="badge badge-admin">Active Session</span>
+                </div>
+                <div class="modal-header-actions">
+                    <button class="btn btn-outline" id="admin-logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+                    <button class="close-modal-btn" onclick="closeAdminDashboard()"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="modal-body admin-dashboard-grid">
+                <!-- LEFT SIDE: FORM PANEL -->
+                <div class="admin-panel-card admin-form-column">
+                    <h4 class="panel-card-title" id="form-action-title">Add New Textbook Entry</h4>
+                    <form id="book-entry-form">
+                        <input type="hidden" id="edit-book-id">
+                        
+                        <div class="form-group">
+                            <label for="book-title-input">Book Title <span class="required">*</span></label>
+                            <input type="text" id="book-title-input" placeholder="e.g., Class 10 Mathematics SCERT (English Medium)" required autocomplete="off">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label for="book-class-select">Class / Grade <span class="required">*</span></label>
+                                <select id="book-class-select" required>
+                                    <option value="" disabled selected>Select class...</option>
+                                    <option value="6">Class 6</option>
+                                    <option value="7">Class 7</option>
+                                    <option value="8">Class 8</option>
+                                    <option value="9">Class 9</option>
+                                    <option value="10">Class 10</option>
+                                    <option value="11">Class 11 (Intermediate 1st Yr)</option>
+                                    <option value="12">Class 12 (Intermediate 2nd Yr)</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="book-medium-select">Language / Medium</label>
+                                <select id="book-medium-select">
+                                    <option value="English" selected>English Medium</option>
+                                    <option value="Telugu">Telugu Medium</option>
+                                    <option value="Bilingual">Bilingual</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Cover Image Source <span class="required">*</span></label>
+                            <div class="cover-input-choices">
+                                <button type="button" id="btn-choice-upload" class="btn-choice active">Upload File</button>
+                                <button type="button" id="btn-choice-url" class="btn-choice">Paste URL</button>
+                            </div>
+                            
+                            <!-- Choice 1: File Upload (Default) -->
+                            <div id="cover-upload-wrapper" class="cover-input-field">
+                                <div class="file-drop-area">
+                                    <i class="fa-solid fa-cloud-arrow-up file-upload-icon"></i>
+                                    <span class="file-upload-label">Click to select cover image</span>
+                                    <span class="file-upload-info">Supports JPG, PNG, WEBP (Max 2MB)</span>
+                                    <input type="file" id="book-cover-file" accept="image/*">
+                                </div>
+                                <div id="selected-file-banner" class="selected-file-info" style="display: none;">
+                                    <i class="fa-solid fa-file-image"></i> <span id="selected-file-name">filename.jpg</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Choice 2: Direct URL Input -->
+                            <div id="cover-url-wrapper" class="cover-input-field" style="display: none;">
+                                <input type="url" id="book-cover-url" placeholder="https://example.com/cover-image.jpg" autocomplete="off">
+                                <p class="form-help-text">Paste a direct internet link to an image (e.g. from SCERT hosting).</p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="book-onedrive-url">OneDrive Textbook URL <span class="required">*</span></label>
+                            <input type="url" id="book-onedrive-url" placeholder="https://1drv.ms/... or https://onedrive.live.com/..." required autocomplete="off">
+                            <p class="form-help-text">Share link from OneDrive. The system automatically handles embed redirection formatting.</p>
+                        </div>
+
+                        <!-- LIVE PREVIEW AREA -->
+                        <div class="cover-live-preview-box">
+                            <span class="preview-label">Live Thumbnail Preview</span>
+                            <div class="preview-display">
+                                <div id="preview-image-container" class="preview-img-frame">
+                                    <!-- Fallback or loaded cover preview -->
+                                    <div class="preview-placeholder">
+                                        <i class="fa-solid fa-image"></i>
+                                        <span>Waiting for valid URL...</span>
+                                    </div>
+                                    <img id="live-cover-preview" src="" alt="Book Cover Preview" style="display:none;" onerror="handlePreviewError()">
+                                </div>
+                                <div class="preview-meta-details">
+                                    <h5 id="preview-title-text">Book Title Preview</h5>
+                                    <span id="preview-class-badge" class="badge">Class -</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-buttons-row">
+                            <button type="button" id="cancel-edit-btn" class="btn btn-outline" style="display: none;">Cancel Edit</button>
+                            <button type="submit" id="save-book-btn" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Book Entry</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- RIGHT SIDE: ACTIVE BOOKS LIST -->
+                <div class="admin-panel-card admin-list-column">
+                    <div class="panel-card-header">
+                        <h4 class="panel-card-title">Active Bookshelf Records</h4>
+                        <div class="admin-search-wrapper">
+                            <i class="fa-solid fa-magnifying-glass admin-search-icon"></i>
+                            <input type="text" id="admin-search-input" placeholder="Quick filter records...">
+                        </div>
+                    </div>
+                    <div class="admin-table-container">
+                        <table class="admin-books-table">
+                            <thead>
+                                <tr>
+                                    <th>Thumbnail</th>
+                                    <th>Title</th>
+                                    <th>Class</th>
+                                    <th>Medium</th>
+                                    <th class="actions-header">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-books-list-rows">
+                                <!-- Generated rows go here -->
+                            </tbody>
+                        </table>
+                        <div id="admin-no-records" class="table-empty-state" style="display: none;">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <p>No matching bookshelf entries found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Notification System -->
+    <div id="toast-notification" class="toast-card" style="display: none;">
+        <div class="toast-icon" id="toast-icon-holder"><i class="fa-solid fa-check"></i></div>
+        <div class="toast-body">
+            <span id="toast-title" class="toast-title-text">Notification</span>
+            <p id="toast-message" class="toast-message-text">Operation completed successfully.</p>
+        </div>
+    </div>
+
+    <!-- Main JS Application Code -->
+    <script src="app.js"></script>
+</body>
+</html>
