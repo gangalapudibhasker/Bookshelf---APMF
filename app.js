@@ -174,16 +174,30 @@ function bookFromSupabase(book) {
     return normalizeBookRecord(book);
 }
 
-function bookToSupabase(book) {
+function buildSupabasePayload(book, urlColumn = 'book_url') {
     return {
         id: book.id,
         title: book.title,
         grade_class: book.gradeClass,
         medium: book.medium,
         cover_url: book.coverUrl,
-        book_url: book.bookUrl,
+        [urlColumn]: book.bookUrl,
         updated_at: new Date().toISOString()
     };
+}
+
+function bookToSupabase(book) {
+    return buildSupabasePayload(book, 'book_url');
+}
+
+async function tryPersistBookRecord(book, urlColumn) {
+    const payload = buildSupabasePayload(book, urlColumn);
+    const { error } = await supabaseClient
+        .from(SUPABASE_BOOKS_TABLE)
+        .upsert(payload, { onConflict: 'id', returning: 'minimal' });
+
+    if (error) throw error;
+    return true;
 }
 
 function getSupabaseErrorMessage(error) {
@@ -243,26 +257,53 @@ async function persistBookRecord(book) {
     if (!supabaseSyncEnabled) return true;
 
     try {
-        const { error } = await supabaseClient
-            .from(SUPABASE_BOOKS_TABLE)
-            .upsert(bookToSupabase(book), { onConflict: 'id', returning: 'minimal' });
-
-        if (error) throw error;
-        return true;
+        return await tryPersistBookRecord(book, 'book_url');
     } catch (err) {
         const message = getSupabaseErrorMessage(err);
         console.error("Failed to save book metadata to Supabase.", err);
 
         if (message.includes("Could not find the 'book_url' column") || message.includes('schema cache')) {
-            showToast(
-                "Metadata Sync Failed",
-                "Supabase schema is missing the book_url column in public.books. Re-run the latest `supabase/books_schema.sql` script in the Supabase SQL Editor or add the column manually.",
-                "error"
-            );
-        } else {
-            showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
+            try {
+                await tryPersistBookRecord(book, 'onedrive_url');
+                showToast(
+                    "Metadata Sync Succeeded (Fallback)",
+                    "Saved metadata using legacy onedrive_url column. Please update your Supabase schema by rerunning `supabase/books_schema.sql`.",
+                    "success"
+                );
+                return true;
+            } catch (legacyErr) {
+                const legacyMessage = getSupabaseErrorMessage(legacyErr);
+                if (legacyMessage.includes("Could not find the 'onedrive_url' column") || legacyMessage.includes('schema cache')) {
+                    try {
+                        await tryPersistBookRecord(book, 'file_url');
+                        showToast(
+                            "Metadata Sync Succeeded (Fallback)",
+                            "Saved metadata using legacy file_url column. Please update your Supabase schema by rerunning `supabase/books_schema.sql`.",
+                            "success"
+                        );
+                        return true;
+                    } catch (fileErr) {
+                        console.error("Legacy book_url fallback also failed.", fileErr);
+                        showToast(
+                            "Metadata Sync Failed",
+                            "Supabase schema is missing the book_url/onedrive_url/file_url column on public.books. Re-run `supabase/books_schema.sql` or add the missing column manually.",
+                            "error"
+                        );
+                        return false;
+                    }
+                }
+
+                console.error("Legacy onedrive_url fallback failed.", legacyErr);
+                showToast(
+                    "Metadata Sync Failed",
+                    `The cover uploaded, but Supabase metadata save failed: ${legacyMessage}`,
+                    "error"
+                );
+                return false;
+            }
         }
 
+        showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
         return false;
     }
 }
