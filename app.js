@@ -10,9 +10,9 @@ let currentSearchQuery = "";
 let editingBookId = null;
 let isAdminAuthenticated = false;
 
-// Supabase Connection Configurations
-const SUPABASE_URL = "https://uelnmcbwicwheancmgcu.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbG5tY2J3aWN3aGVhbmNtZ2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDA4ODgsImV4cCI6MjA5NDM3Njg4OH0.IQ8YFiofOeW0Vs_FI_w01pKf56YNe8qorJXa__7RR4I";
+// Supabase Connection Configurations (Updated to correct Project ID and Key)
+const SUPABASE_URL = "https://wothdcwqbsrcvkiaoejk.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvdGhkY3dxYnNyY3ZraWFvZWprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMTE0OTgsImV4cCI6MjA5NDg4NzQ5OH0.vOE5gChXqA9U-uIYgsboQ4xLaJBekI1Ca2F-DUoiRh8";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const SUPABASE_BOOKS_TABLE = "books";
 const SUPABASE_STORAGE_BUCKET = "book-shelf";
@@ -908,7 +908,7 @@ async function triggerDeleteBook(id, title) {
     }
 }
 
-// Render rows in dashboard list
+// Render dynamic rows in admin dashboard book list table
 function renderAdminBooksList(filterStr = "") {
     DOM.adminBooksListRows.innerHTML = '';
 
