@@ -34,7 +34,7 @@ The administration panel is secured with standard passcode authentication (no he
 - **Dashboard Features:**
   - **Live Preview Panel:** Instantly checks and previews cover images, titles, and class tags in real-time as the admin inputs the URL before saving.
   - **Administrative CRUD Table:** View all loaded records, search or filter them, edit existing textbooks, and delete obsolete entries.
-  - **Automatic Persistence:** Syncs instantly with `localStorage` in the browser, making sure your database additions persist across page reloads.
+  - **Automatic Persistence:** Saves book metadata to Supabase so deployed Netlify/GitHub Pages instances and other devices show the same bookshelf records. `localStorage` is used only as a temporary offline cache.
 
 ---
 
@@ -60,3 +60,43 @@ This project has zero build dependencies or Node.js runtime needs, making it com
 - `styles.css` — Responsive design tokens, styling rules, light/dark themes, and math SVG grids.
 - `app.js` — Core JavaScript logic (pre-populated textbooks, tab filters, OneDrive formatters, and admin CRUD logic).
 - `logo.png` — (Optional) Place your small custom logo here to override the SVG fallback.
+
+---
+
+## 🔄 Supabase Sync Troubleshooting
+
+Uploaded cover images can exist in Supabase Storage even when the app still shows old data. Storage only keeps the file; the bookshelf UI also needs a metadata record with the book title, class, medium, cover URL, and OneDrive URL.
+
+### Required setup
+1. Open **Supabase Dashboard > SQL Editor**.
+2. Open the repository file `supabase/books_schema.sql`, copy **all of the SQL text inside that file**, paste it into the Supabase SQL Editor, and click **Run**.
+   - Do **not** type or paste only `supabase/books_schema.sql` into the SQL Editor. That is just the file path, not a SQL command, and Supabase will return an error such as `syntax error at or near "supabase"`.
+3. Confirm that:
+   - the `public.books` table exists with the expected columns (`title`, `author`, `cover_image`, `file_attachment`, `genre`, `year`, `description`, `theme`, etc.),
+   - the `book-shelf` storage bucket exists and is public,
+   - Row Level Security policies allow the static app to read and write the table/storage bucket,
+   - Realtime is enabled for `public.books`.
+
+### What the app now does
+- Loads book records from `public.books` as the source of truth, then uses `localStorage` only as a temporary/offline cache if Supabase cannot be reached.
+- Saves every add/edit/delete operation to the Supabase `books` table so updates appear on other browsers and devices.
+- Subscribes to Supabase Realtime changes and refreshes open app windows automatically.
+- Uploads cover files with unique filenames and appends a version query string to avoid stale browser/CDN cache when replacing a cover.
+
+
+### Important Netlify deployment note
+The deployed app no longer renders hardcoded textbook records and filters the old demo records if they were cached or accidentally seeded. If Netlify shows an empty bookshelf, that means the browser could not read rows from `public.books`. Verify each Supabase row has at least `id` and `title`, and verify the select policy allows anonymous reads. The app maps your schema as `cover_image` for covers, `file_attachment` for book files, `author` as the displayed medium/source, and `theme` for class text such as `Class 10`.
+
+### Common causes when uploads do not appear in the UI
+- **Only Storage changed:** A file upload succeeded, but no row was inserted/updated in `public.books`.
+- **RLS blocked metadata writes:** Storage policies may allow uploads while table policies reject `insert`, `update`, or `delete` calls. This is the usual cause of the “Metadata Sync Failed” toast after a successful cover upload.
+- **Private bucket or missing object read policy:** The app receives a URL, but the browser cannot load the image publicly.
+- **Stale cached URL:** Re-uploading to the same object path can keep the old image visible because the public URL did not change.
+- **LocalStorage-only state:** The previous implementation saved the book list per browser, so a GitHub Pages deployment or another device could not see the new records.
+- **Realtime disabled:** Existing open browser tabs will not auto-refresh until reload unless the table is added to the Supabase realtime publication.
+
+### Best practices
+- Treat `public.books` as the source of truth and `localStorage` only as cache; do not seed or render hardcoded/demo records in production.
+- Keep Storage object paths unique for replacement uploads.
+- Watch the browser DevTools console and Network tab for Supabase errors, especially `401`, `403`, missing table/column errors, `NOT NULL` constraint failures, and RLS policy failures.
+- For production security, replace broad anon write policies with Supabase Auth or an Edge Function that verifies administrator access server-side.
