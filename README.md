@@ -77,6 +77,8 @@ Uploaded cover images can exist in Supabase Storage even when the app still show
    - Row Level Security policies allow the static app to read and write the table/storage bucket,
    - Realtime is enabled for `public.books`.
 
+> If you still see "Metadata Sync Failed" after a cover upload, the most common backend issue is that the `public.books` table or its anon RLS policies are not configured correctly in Supabase. Run the SQL script again in the Supabase SQL Editor and verify the `books` table and policies exactly.
+
 ### What the app now does
 - Loads book records from `public.books` as the source of truth, then uses `localStorage` only as a temporary/offline cache if Supabase cannot be reached.
 - Saves every add/edit/delete operation to the Supabase `books` table so updates appear on other browsers and devices.

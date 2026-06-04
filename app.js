@@ -186,12 +186,18 @@ function bookToSupabase(book) {
     };
 }
 
+function getSupabaseErrorMessage(error) {
+    if (!error) return "Unknown Supabase error.";
+    if (typeof error === 'string') return error;
+    return error.message || error.details || error.hint || JSON.stringify(error);
+}
+
 async function fetchBooksFromSupabase() {
     const { data, error } = await supabaseClient
         .from(SUPABASE_BOOKS_TABLE)
         .select('*');
 
-    if (error) throw error;
+    if (error) throw new Error(getSupabaseErrorMessage(error));
 
     return (data || [])
         .map(bookFromSupabase)
@@ -239,13 +245,14 @@ async function persistBookRecord(book) {
     try {
         const { error } = await supabaseClient
             .from(SUPABASE_BOOKS_TABLE)
-            .upsert(bookToSupabase(book), { onConflict: 'id' });
+            .upsert(bookToSupabase(book), { onConflict: 'id', returning: 'minimal' });
 
         if (error) throw error;
         return true;
     } catch (err) {
+        const message = getSupabaseErrorMessage(err);
         console.error("Failed to save book metadata to Supabase.", err);
-        showToast("Metadata Sync Failed", "The cover uploaded, but the book list could not be saved to Supabase. Check the books table/RLS policies.", "error");
+        showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
         return false;
     }
 }
