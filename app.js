@@ -146,7 +146,7 @@ function normalizeBookRecord(book) {
     return {
         id: book.id,
         title: book.title,
-        gradeClass: book.gradeClass || book.grade_class || book.class || book.grade,
+        grade: book.grade || book.gradeClass || book.grade_class || book.class,
         medium: book.medium || "English",
         coverUrl: book.coverUrl || book.cover_url || book.cover || book.image_url,
         bookUrl: book.bookUrl || book.book_url || book.onedrive_url || book.file_url || book.url,
@@ -156,7 +156,7 @@ function normalizeBookRecord(book) {
 }
 
 function isDisplayableBookRecord(book) {
-    return Boolean(book.id && book.title && book.gradeClass && book.coverUrl && book.bookUrl);
+    return Boolean(book.id && book.title && book.grade && book.coverUrl && book.bookUrl);
 }
 
 function isLegacyDemoBookRecord(book) {
@@ -178,7 +178,7 @@ function buildSupabasePayload(book, urlColumn = 'book_url') {
     return {
         id: book.id,
         title: book.title,
-        grade_class: book.gradeClass,
+        grade: book.grade,
         medium: book.medium,
         cover_url: book.coverUrl,
         [urlColumn]: book.bookUrl,
@@ -190,17 +190,9 @@ function bookToSupabase(book) {
     return buildSupabasePayload(book, 'book_url');
 }
 
-function getDisplayLabelForGrade(gradeClass) {
-    if (!gradeClass) return '';
-    const normalized = gradeClass.toString();
-    if (['NMMS', 'Other'].includes(normalized)) {
-        return normalized;
-    }
-    return `Class ${normalized}`;
-}
-
-function isNumericGrade(gradeClass) {
-    return !Number.isNaN(Number.parseInt(gradeClass, 10));
+function getDisplayLabelForGrade(grade) {
+    if (!grade) return '';
+    return `Class ${grade}`;
 }
 
 async function tryPersistBookRecord(book, urlColumn) {
@@ -572,11 +564,11 @@ function checkHashRouter() {
 function updateUi() {
     // 1. Filter books based on active tab class AND search query
     let filteredBooks = books.filter(book => {
-        const matchesClass = activeClassFilter === 'all' || book.gradeClass === activeClassFilter;
+        const matchesClass = activeClassFilter === 'all' || book.grade === activeClassFilter;
 
         const titleMatch = book.title.toLowerCase().includes(currentSearchQuery);
         const mediumMatch = book.medium.toLowerCase().includes(currentSearchQuery);
-        const classMatch = `class ${book.gradeClass}`.includes(currentSearchQuery);
+        const classMatch = `class ${book.grade}`.includes(currentSearchQuery);
         const matchesSearch = titleMatch || mediumMatch || classMatch;
 
         return matchesClass && matchesSearch;
@@ -589,9 +581,7 @@ function updateUi() {
     updateClassTabsCount();
 
     // 4. Update Header Indicator
-const sectionName = activeClassFilter === 'all'
-            ? 'All Books'
-            : getDisplayLabelForGrade(activeClassFilter);
+    const sectionName = activeClassFilter === 'all' ? 'All Books' : getDisplayLabelForGrade(activeClassFilter);
     DOM.currentSectionTitle.textContent = `${sectionName} Mathematics Textbooks`;
 
     if (currentSearchQuery) {
@@ -625,18 +615,8 @@ function renderBooksGrid(booksToRender) {
 
         // Math character symbol fallback selector based on class number
         const symbols = ['∑', '√', 'π', '∞', '∫', '∆', 'θ'];
-        const gradeValue = book.gradeClass || '';
-        let classIndex;
-        if (isNumericGrade(gradeValue)) {
-            classIndex = parseInt(gradeValue, 10) - 6;
-        } else if (gradeValue === 'NMMS') {
-            classIndex = 7;
-        } else if (gradeValue === 'Other') {
-            classIndex = 8;
-        } else {
-            classIndex = 6;
-        }
-        const mathSymbol = symbols[((classIndex % symbols.length) + symbols.length) % symbols.length];
+        const classIndex = (parseInt(book.grade, 10) || 6) - 6;
+        const mathSymbol = symbols[classIndex % symbols.length];
 
         card.innerHTML = `
             <div class="card-cover-wrapper">
@@ -645,7 +625,7 @@ function renderBooksGrid(booksToRender) {
             </div>
             <div class="card-details">
                 <div class="card-meta">
-                    <span class="badge badge-class">${getDisplayLabelForGrade(book.gradeClass)}</span>
+                    <span class="badge badge-class">${getDisplayLabelForGrade(book.grade)}</span>
                     <span class="badge badge-medium">${book.medium} Medium</span>
                 </div>
                 <h4 class="card-title" title="${book.title}">${book.title}</h4>
@@ -691,14 +671,13 @@ function updateClassTabsCount() {
     // 1. Total Count
     document.getElementById('count-all').textContent = books.length;
 
-    // 2. Class/category-specific counts
-    const countGroups = ['6', '7', '8', '9', '10', '11', '12', 'NMMS', 'Other'];
-    countGroups.forEach(group => {
-        const countEl = document.getElementById(`count-${group}`);
+    // 2. Grade-specific counts
+    for (let c = 6; c <= 12; c++) {
+        const countEl = document.getElementById(`count-${c}`);
         if (countEl) {
-            countEl.textContent = books.filter(book => book.gradeClass === group).length;
+            countEl.textContent = books.filter(book => book.grade === c.toString()).length;
         }
-    });
+    }
 }
 
 // 10. Admin Authentication Modal Controls
@@ -908,10 +887,7 @@ async function handleBookFormSubmit(e) {
             bookToSave = {
                 id: editingBookId,
                 title: titleVal,
-                gradeClass: classVal,
-                medium: mediumVal,
-                coverUrl: finalCoverUrl,
-                bookUrl: onedriveUrlVal
+            grade: classVal,
             };
 
             const synced = await persistBookRecord(bookToSave);
@@ -929,7 +905,7 @@ async function handleBookFormSubmit(e) {
         bookToSave = {
             id: `book-${Date.now()}`,
             title: titleVal,
-            gradeClass: classVal,
+            grade: classVal,
             medium: mediumVal,
             coverUrl: finalCoverUrl,
             bookUrl: onedriveUrlVal
@@ -962,7 +938,7 @@ function triggerEditBook(id) {
     editingBookId = book.id;
     DOM.editBookId.value = book.id;
     DOM.bookTitleInput.value = book.title;
-    DOM.bookClassSelect.value = book.gradeClass;
+    DOM.bookClassSelect.value = book.grade;
     DOM.bookMediumSelect.value = book.medium;
     
     // Default edit mode to URL tab to display current URL
@@ -1014,7 +990,7 @@ function renderAdminBooksList(filterStr = "") {
 
     let filteredRecords = books.filter(book => {
         const titleMatch = book.title.toLowerCase().includes(filterStr);
-        const classMatch = `class ${book.gradeClass}`.includes(filterStr);
+        const classMatch = `class ${book.grade}`.includes(filterStr);
         const mediumMatch = book.medium.toLowerCase().includes(filterStr);
         return titleMatch || classMatch || mediumMatch;
     });
@@ -1033,7 +1009,7 @@ function renderAdminBooksList(filterStr = "") {
             <td>
                 <div class="admin-book-title-cell" title="${book.title}">${book.title}</div>
             </td>
-            <td><span class="badge badge-class">${getDisplayLabelForGrade(book.gradeClass)}</span></td>
+            <td><span class="badge badge-class">${getDisplayLabelForGrade(book.grade)}</span></td>
             <td><span class="badge badge-medium">${book.medium}</span></td>
             <td>
                 <div class="admin-row-actions">
