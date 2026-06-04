@@ -72,7 +72,7 @@ Uploaded cover images can exist in Supabase Storage even when the app still show
 2. Open the repository file `supabase/books_schema.sql`, copy **all of the SQL text inside that file**, paste it into the Supabase SQL Editor, and click **Run**.
    - Do **not** type or paste only `supabase/books_schema.sql` into the SQL Editor. That is just the file path, not a SQL command, and Supabase will return an error such as `syntax error at or near "supabase"`.
 3. Confirm that:
-   - the `public.books` table exists with the expected columns (`title`, `author`, `cover_image`, `file_attachment`, `genre`, `year`, `description`, `theme`, etc.),
+   - the `public.books` table exists,
    - the `book-shelf` storage bucket exists and is public,
    - Row Level Security policies allow the static app to read and write the table/storage bucket,
    - Realtime is enabled for `public.books`.
@@ -85,11 +85,11 @@ Uploaded cover images can exist in Supabase Storage even when the app still show
 
 
 ### Important Netlify deployment note
-The deployed app no longer renders hardcoded textbook records and filters the old demo records if they were cached or accidentally seeded. If Netlify shows an empty bookshelf, that means the browser could not read rows from `public.books`. Verify each Supabase row has at least `id` and `title`, and verify the select policy allows anonymous reads. The app maps your schema as `cover_image` for covers, `file_attachment` for book files, `author` as the displayed medium/source, and `theme` for class text such as `Class 10`.
+The deployed app no longer renders hardcoded textbook records and filters the old demo records if they were cached or accidentally seeded. If Netlify shows an empty bookshelf, that means the browser could not read displayable rows from `public.books`. Verify each Supabase row has `id`, `title`, `grade_class`, `medium`, `cover_url`, and `book_url` values and that the select policy allows anonymous reads.
 
 ### Common causes when uploads do not appear in the UI
 - **Only Storage changed:** A file upload succeeded, but no row was inserted/updated in `public.books`.
-- **RLS blocked metadata writes:** Storage policies may allow uploads while table policies reject `insert`, `update`, or `delete` calls. This is the usual cause of the “Metadata Sync Failed” toast after a successful cover upload.
+- **RLS blocked metadata writes:** Storage policies may allow uploads while table policies reject `insert`, `update`, or `delete` calls.
 - **Private bucket or missing object read policy:** The app receives a URL, but the browser cannot load the image publicly.
 - **Stale cached URL:** Re-uploading to the same object path can keep the old image visible because the public URL did not change.
 - **LocalStorage-only state:** The previous implementation saved the book list per browser, so a GitHub Pages deployment or another device could not see the new records.
@@ -98,5 +98,5 @@ The deployed app no longer renders hardcoded textbook records and filters the ol
 ### Best practices
 - Treat `public.books` as the source of truth and `localStorage` only as cache; do not seed or render hardcoded/demo records in production.
 - Keep Storage object paths unique for replacement uploads.
-- Watch the browser DevTools console and Network tab for Supabase errors, especially `401`, `403`, missing table/column errors, `NOT NULL` constraint failures, and RLS policy failures.
+- Watch the browser DevTools console and Network tab for Supabase errors, especially `401`, `403`, missing table, and RLS policy failures.
 - For production security, replace broad anon write policies with Supabase Auth or an Edge Function that verifies administrator access server-side.

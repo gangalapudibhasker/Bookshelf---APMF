@@ -143,36 +143,20 @@ function saveBooksDatabase() {
 }
 
 function normalizeBookRecord(book) {
-    const title = book.title || "Untitled Book";
-    const gradeClass = normalizeGradeClass(book.gradeClass || book.grade_class || book.class || book.grade || book.class_level || book.theme || book.genre || title || book.description);
-    const medium = book.medium || book.author || book.subject || "English";
-    const coverUrl = book.coverUrl || book.cover_url || book.cover_image || book.cover || book.image_url || createPlaceholderCover(title, gradeClass);
-    const bookUrl = book.bookUrl || book.book_url || book.file_attachment || book.onedrive_url || book.file_url || book.url || '#';
-
     return {
         id: book.id,
-        title,
-        gradeClass,
-        medium,
-        coverUrl,
-        bookUrl,
+        title: book.title,
+        gradeClass: book.gradeClass || book.grade_class || book.class || book.grade,
+        medium: book.medium || "English",
+        coverUrl: book.coverUrl || book.cover_url || book.cover || book.image_url,
+        bookUrl: book.bookUrl || book.book_url || book.onedrive_url || book.file_url || book.url,
         createdAt: book.createdAt || book.created_at || null,
         updatedAt: book.updatedAt || book.updated_at || null
     };
 }
 
-function normalizeGradeClass(value) {
-    const classMatch = String(value || '').match(/(?:class|grade|level)?\s*(6|7|8|9|10|11|12)\b/i);
-    return classMatch ? classMatch[1] : '10';
-}
-
-function createPlaceholderCover(title, gradeClass) {
-    const shortTitle = encodeURIComponent(title.slice(0, 28));
-    return `https://via.placeholder.com/400x560/1e1b4b/a5b4fc?text=Class+${gradeClass}+Math%0A${shortTitle}`;
-}
-
 function isDisplayableBookRecord(book) {
-    return Boolean(book.id && book.title && book.gradeClass);
+    return Boolean(book.id && book.title && book.gradeClass && book.coverUrl && book.bookUrl);
 }
 
 function isLegacyDemoBookRecord(book) {
@@ -194,16 +178,10 @@ function bookToSupabase(book) {
     return {
         id: book.id,
         title: book.title,
-        author: book.medium || 'APMF',
-        cover_image: book.coverUrl,
-        file_attachment: book.bookUrl,
-        file_name: `${book.title}.pdf`,
-        color: '#1e3a8a',
-        accent_color: '#60a5fa',
-        genre: 'Mathematics',
-        year: new Date().getFullYear(),
-        description: `${book.title} - Class ${book.gradeClass} ${book.medium || 'English'} Medium mathematics resource.`,
-        theme: `Class ${book.gradeClass}`,
+        grade_class: book.gradeClass,
+        medium: book.medium,
+        cover_url: book.coverUrl,
+        book_url: book.bookUrl,
         updated_at: new Date().toISOString()
     };
 }
@@ -267,7 +245,7 @@ async function persistBookRecord(book) {
         return true;
     } catch (err) {
         console.error("Failed to save book metadata to Supabase.", err);
-        showToast("Metadata Sync Failed", `The cover uploaded, but metadata could not be saved: ${err.message}. Re-run supabase/books_schema.sql to add write policies and required columns.`, "error");
+        showToast("Metadata Sync Failed", "The cover uploaded, but the book list could not be saved to Supabase. Check the books table/RLS policies.", "error");
         return false;
     }
 }
