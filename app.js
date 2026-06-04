@@ -252,7 +252,17 @@ async function persistBookRecord(book) {
     } catch (err) {
         const message = getSupabaseErrorMessage(err);
         console.error("Failed to save book metadata to Supabase.", err);
-        showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
+
+        if (message.includes("Could not find the 'book_url' column") || message.includes('schema cache')) {
+            showToast(
+                "Metadata Sync Failed",
+                "Supabase schema is missing the book_url column in public.books. Re-run the latest `supabase/books_schema.sql` script in the Supabase SQL Editor or add the column manually.",
+                "error"
+            );
+        } else {
+            showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
+        }
+
         return false;
     }
 }

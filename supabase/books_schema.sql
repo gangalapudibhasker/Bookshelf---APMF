@@ -14,6 +14,33 @@ create table if not exists public.books (
   updated_at timestamptz not null default now()
 );
 
+-- Ensure older tables created before these columns existed are upgraded safely.
+alter table public.books
+  add column if not exists cover_url text not null default '';
+alter table public.books
+  add column if not exists book_url text not null default '';
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'books' and column_name = 'onedrive_url'
+  ) then
+    update public.books
+    set book_url = onedrive_url
+    where (book_url is null or book_url = '') and onedrive_url is not null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'books' and column_name = 'file_url'
+  ) then
+    update public.books
+    set book_url = file_url
+    where (book_url is null or book_url = '') and file_url is not null;
+  end if;
+end $$;
+
 alter table public.books enable row level security;
 
 -- Public users can read the bookshelf.
