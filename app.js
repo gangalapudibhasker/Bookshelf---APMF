@@ -14,7 +14,7 @@ let isAdminAuthenticated = false;
 const SUPABASE_URL = "https://uelnmcbwicwheancmgcu.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbG5tY2J3aWN3aGVhbmNtZ2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDA4ODgsImV4cCI6MjA5NDM3Njg4OH0.IQ8YFiofOeW0Vs_FI_w01pKf56YNe8qorJXa__7RR4I";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const SUPABASE_CURRICULUM_TABLE = "curriculum";
+const SUPABASE_BOOKS_TABLE = "books";
 const SUPABASE_STORAGE_BUCKET = "book-shelf";
 const LOCAL_BOOKS_CACHE_KEY = "apmf_bookshelf_db";
 
@@ -113,19 +113,13 @@ async function loadBooksDatabase() {
     }
 
     try {
-        books = await fetchBooksFromSupabase();
+        const supabaseBooks = await fetchBooksFromSupabase();
+        books = supabaseBooks;
         saveBooksDatabase();
     } catch (err) {
         supabaseSyncEnabled = false;
-        console.error("Supabase curriculum table could not be loaded. Trying to display files directly from Supabase Storage.", err);
-
-        try {
-            books = await fetchBooksFromSupabaseStorage();
-            saveBooksDatabase();
-        } catch (storageErr) {
-            books = loadBooksFromLocalCache();
-            console.error("Supabase Storage could not be listed. Showing cached records only; hardcoded demo data will not be used.", storageErr);
-        }
+        books = loadBooksFromLocalCache();
+        console.error("Supabase books table could not be loaded. Showing cached records only; hardcoded demo data will not be used.", err);
     }
 }
 
@@ -149,36 +143,20 @@ function saveBooksDatabase() {
 }
 
 function normalizeBookRecord(book) {
-    const title = book.title || "Untitled Book";
-    const gradeClass = normalizeGradeClass(book.gradeClass || book.grade_class || book.class || book.grade || book.classLevel || book.class_level || book.theme || book.genre || title || book.description);
-    const medium = book.medium || book.subject || book.author || "Mathematics";
-    const coverUrl = book.coverUrl || book.coverUrl || book.cover_url || book.coverImage || book.cover_image || book.cover || book.image_url || createPlaceholderCover(title, gradeClass);
-    const bookUrl = book.bookUrl || book.bookUrl || book.book_url || book.fileAttachment || book.file_attachment || book.onedrive_url || book.file_url || book.url || '#';
-
     return {
         id: book.id,
-        title,
-        gradeClass,
-        medium,
-        coverUrl,
-        bookUrl,
+        title: book.title,
+        gradeClass: book.gradeClass || book.grade_class || book.class || book.grade,
+        medium: book.medium || "English",
+        coverUrl: book.coverUrl || book.cover_url || book.cover || book.image_url,
+        bookUrl: book.bookUrl || book.book_url || book.onedrive_url || book.file_url || book.url,
         createdAt: book.createdAt || book.created_at || null,
         updatedAt: book.updatedAt || book.updated_at || null
     };
 }
 
-function normalizeGradeClass(value) {
-    const classMatch = String(value || '').match(/(?:class|grade|level)?\s*(6|7|8|9|10|11|12)\b/i);
-    return classMatch ? classMatch[1] : '10';
-}
-
-function createPlaceholderCover(title, gradeClass) {
-    const shortTitle = encodeURIComponent(title.slice(0, 28));
-    return `https://via.placeholder.com/400x560/1e1b4b/a5b4fc?text=Class+${gradeClass}+Math%0A${shortTitle}`;
-}
-
 function isDisplayableBookRecord(book) {
-    return Boolean(book.id && book.title && book.gradeClass);
+    return Boolean(book.id && book.title && book.gradeClass && book.coverUrl && book.bookUrl);
 }
 
 function isLegacyDemoBookRecord(book) {
@@ -200,128 +178,36 @@ function bookToSupabase(book) {
     return {
         id: book.id,
         title: book.title,
-        subject: book.medium || 'Mathematics',
-        description: `${book.title} - Class ${book.gradeClass} ${book.medium || 'Mathematics'} resource.`,
-        fileAttachment: book.bookUrl,
-        fileName: `${book.title}.pdf`,
-        classLevel: `Class ${book.gradeClass}`,
-        coverImage: book.coverUrl
+        grade_class: book.gradeClass,
+        medium: book.medium,
+        cover_url: book.coverUrl,
+        book_url: book.bookUrl,
+        updated_at: new Date().toISOString()
     };
 }
 
 async function fetchBooksFromSupabase() {
     const { data, error } = await supabaseClient
-        .from(SUPABASE_CURRICULUM_TABLE)
+        .from(SUPABASE_BOOKS_TABLE)
         .select('*');
 
     if (error) throw error;
 
-    const tableBooks = (data || [])
+    return (data || [])
         .map(bookFromSupabase)
         .filter(isDisplayableBookRecord)
-        .filter(book => !isLegacyDemoBookRecord(book));
-
-    const storageBooks = await fetchBooksFromSupabaseStorage().catch(err => {
-        console.warn("Supabase Storage list skipped; displaying table rows only.", err);
-        return [];
-    });
-
-    return mergeBookSources(tableBooks, storageBooks).sort(sortBooksNewestFirst);
-}
-
-async function fetchBooksFromSupabaseStorage() {
-    const storageBooks = await listStorageBooksRecursive('', 0);
-    return storageBooks
-        .filter(isDisplayableBookRecord)
-        .filter(book => !isLegacyDemoBookRecord(book));
-}
-
-async function listStorageBooksRecursive(pathPrefix = '', depth = 0) {
-    if (depth > 4) return [];
-
-    const { data, error } = await supabaseClient.storage
-        .from(SUPABASE_STORAGE_BUCKET)
-        .list(pathPrefix, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
-
-    if (error) throw error;
-
-    const records = [];
-
-    for (const item of data || []) {
-        const itemPath = pathPrefix ? `${pathPrefix}/${item.name}` : item.name;
-        const isFolder = !item.id && !item.metadata?.mimetype && !item.name.includes('.');
-
-        if (isFolder) {
-            records.push(...await listStorageBooksRecursive(itemPath, depth + 1));
-            continue;
-        }
-
-        records.push(storageObjectToBook(itemPath, item));
-    }
-
-    return records;
-}
-
-function storageObjectToBook(storagePath, item) {
-    const { data: publicUrlData } = supabaseClient.storage
-        .from(SUPABASE_STORAGE_BUCKET)
-        .getPublicUrl(storagePath);
-
-    const publicUrl = publicUrlData.publicUrl;
-    const isImage = /\.(png|jpe?g|webp|gif|avif)$/i.test(storagePath);
-    const title = humanizeStorageFileName(item.name);
-    const gradeClass = normalizeGradeClass(storagePath);
-
-    return {
-        id: `storage-${storagePath.replace(/[^a-zA-Z0-9]/g, '-')}`,
-        title,
-        gradeClass,
-        medium: 'Supabase Storage',
-        coverUrl: isImage ? publicUrl : createPlaceholderCover(title, gradeClass),
-        bookUrl: publicUrl,
-        createdAt: item.created_at || item.updated_at || null,
-        updatedAt: item.updated_at || item.created_at || null
-    };
-}
-
-function humanizeStorageFileName(fileName) {
-    return fileName
-        .replace(/\.[^.]+$/, '')
-        .replace(/-\d{10,}(?:-[a-z0-9]+)?$/i, '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim() || 'Supabase File';
-}
-
-function mergeBookSources(tableBooks, storageBooks) {
-    const merged = new Map();
-
-    storageBooks.forEach(book => merged.set(book.id, book));
-    tableBooks.forEach(book => {
-        const bookCoverUrl = normalizeUrlForComparison(book.coverUrl);
-        const bookFileUrl = normalizeUrlForComparison(book.bookUrl);
-        const storageMatch = storageBooks.find(storageBook => (
-            normalizeUrlForComparison(storageBook.coverUrl) === bookCoverUrl
-            || normalizeUrlForComparison(storageBook.bookUrl) === bookFileUrl
-        ));
-        merged.set(storageMatch?.id || book.id, book);
-    });
-
-    return Array.from(merged.values());
-}
-
-function normalizeUrlForComparison(url) {
-    return String(url || '').split('?')[0];
+        .filter(book => !isLegacyDemoBookRecord(book))
+        .sort(sortBooksNewestFirst);
 }
 
 function setupBooksRealtimeSync() {
     if (!supabaseSyncEnabled || booksRealtimeChannel) return;
 
     booksRealtimeChannel = supabaseClient
-        .channel('public-curriculum-sync')
+        .channel('public-books-sync')
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: SUPABASE_CURRICULUM_TABLE },
+            { event: '*', schema: 'public', table: SUPABASE_BOOKS_TABLE },
             async () => {
                 await refreshBooksFromSupabase();
             }
@@ -330,7 +216,7 @@ function setupBooksRealtimeSync() {
             if (err) {
                 console.error("Supabase realtime subscription failed.", err);
             }
-            console.info(`Curriculum realtime sync status: ${status}`);
+            console.info(`Books realtime sync status: ${status}`);
         });
 }
 
@@ -352,14 +238,14 @@ async function persistBookRecord(book) {
 
     try {
         const { error } = await supabaseClient
-            .from(SUPABASE_CURRICULUM_TABLE)
+            .from(SUPABASE_BOOKS_TABLE)
             .upsert(bookToSupabase(book), { onConflict: 'id' });
 
         if (error) throw error;
         return true;
     } catch (err) {
-        console.error("Failed to save book metadata to Supabase. The UI will still show this upload from local cache/storage listing.", err);
-        showToast("Upload Saved", "The file uploaded and is visible in this browser. To sync it across devices, run supabase/books_schema.sql so the curriculum table allows metadata writes.", "success");
+        console.error("Failed to save book metadata to Supabase.", err);
+        showToast("Metadata Sync Failed", "The cover uploaded, but the book list could not be saved to Supabase. Check the books table/RLS policies.", "error");
         return false;
     }
 }
@@ -369,7 +255,7 @@ async function deleteBookRecordFromSupabase(id) {
 
     try {
         const { error } = await supabaseClient
-            .from(SUPABASE_CURRICULUM_TABLE)
+            .from(SUPABASE_BOOKS_TABLE)
             .delete()
             .eq('id', id);
 
@@ -377,7 +263,7 @@ async function deleteBookRecordFromSupabase(id) {
         return true;
     } catch (err) {
         console.error("Failed to delete book metadata from Supabase.", err);
-        showToast("Delete Sync Failed", "The local row was removed, but Supabase could not be updated. Check the curriculum table/RLS policies.", "error");
+        showToast("Delete Sync Failed", "The local row was removed, but Supabase could not be updated. Check the books table/RLS policies.", "error");
         return false;
     }
 }
@@ -943,7 +829,12 @@ async function handleBookFormSubmit(e) {
                 bookUrl: onedriveUrlVal
             };
 
-            await persistBookRecord(bookToSave);
+            const synced = await persistBookRecord(bookToSave);
+            if (!synced && supabaseSyncEnabled) {
+                DOM.saveBookBtn.disabled = false;
+                DOM.saveBookBtn.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Update Book Record';
+                return;
+            }
 
             books[idx] = bookToSave;
             showToast("Book Updated", `Successfully modified textbook: "${titleVal}"`, "success");
@@ -959,7 +850,12 @@ async function handleBookFormSubmit(e) {
             bookUrl: onedriveUrlVal
         };
 
-        await persistBookRecord(bookToSave);
+        const synced = await persistBookRecord(bookToSave);
+        if (!synced && supabaseSyncEnabled) {
+            DOM.saveBookBtn.disabled = false;
+            DOM.saveBookBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Book Entry';
+            return;
+        }
 
         books.unshift(bookToSave); // Prepend to beginning so it appears first
         showToast("Book Added", `Successfully added new textbook to bookshelf: "${titleVal}"`, "success");

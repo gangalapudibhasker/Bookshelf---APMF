@@ -3,99 +3,82 @@
 -- Do not paste the file path `supabase/books_schema.sql`; that text is not SQL.
 -- Run this script before relying on cross-device syncing.
 
--- The app stores bookshelf metadata in the existing public.curriculum table.
-create table if not exists public.curriculum (
-  id text not null,
+create table if not exists public.books (
+  id text primary key,
   title text not null,
-  subject text null,
-  description text null,
-  "fileAttachment" text null,
-  "fileName" text null,
-  "classLevel" text null,
-  "coverImage" text null,
-  created_at timestamp with time zone not null default timezone('utc'::text, now()),
-  constraint curriculum_pkey primary key (id)
-) tablespace pg_default;
+  grade_class text not null check (grade_class in ('6', '7', '8', '9', '10', '11', '12')),
+  medium text not null default 'English',
+  cover_url text not null,
+  book_url text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
--- Safe compatibility for projects where the table already existed but is missing
--- one of the nullable columns used by the static app.
-alter table public.curriculum add column if not exists subject text null;
-alter table public.curriculum add column if not exists description text null;
-alter table public.curriculum add column if not exists "fileAttachment" text null;
-alter table public.curriculum add column if not exists "fileName" text null;
-alter table public.curriculum add column if not exists "classLevel" text null;
-alter table public.curriculum add column if not exists "coverImage" text null;
-alter table public.curriculum add column if not exists created_at timestamp with time zone not null default timezone('utc'::text, now());
+alter table public.books enable row level security;
 
-create index if not exists idx_curriculum_class_level on public.curriculum("classLevel");
-create index if not exists idx_curriculum_subject on public.curriculum(subject);
-
-alter table public.curriculum enable row level security;
-
--- Public read access for the deployed static site.
-drop policy if exists "Allow public read access on curriculum" on public.curriculum;
-create policy "Allow public read access on curriculum"
-on public.curriculum
+-- Public users can read the bookshelf.
+drop policy if exists "Public read access for books" on public.books;
+create policy "Public read access for books"
+on public.books
 for select
 to anon
 using (true);
 
--- The admin UI runs as a static browser app with the anon key, so it needs anon
--- write policies. Without these, uploads can succeed in Storage while metadata
--- upserts fail.
-drop policy if exists "Allow anon insert on curriculum" on public.curriculum;
-create policy "Allow anon insert on curriculum"
-on public.curriculum
+-- This static app currently uses the anon key from the browser, so writes must be allowed
+-- for the admin dashboard to save metadata. For production, move admin writes behind
+-- Supabase Auth or an Edge Function instead of broad anon write policies.
+drop policy if exists "Anon insert access for books" on public.books;
+create policy "Anon insert access for books"
+on public.books
 for insert
 to anon
 with check (true);
 
-drop policy if exists "Allow anon update on curriculum" on public.curriculum;
-create policy "Allow anon update on curriculum"
-on public.curriculum
+drop policy if exists "Anon update access for books" on public.books;
+create policy "Anon update access for books"
+on public.books
 for update
 to anon
 using (true)
 with check (true);
 
-drop policy if exists "Allow anon delete on curriculum" on public.curriculum;
-create policy "Allow anon delete on curriculum"
-on public.curriculum
+drop policy if exists "Anon delete access for books" on public.books;
+create policy "Anon delete access for books"
+on public.books
 for delete
 to anon
 using (true);
 
--- Enable realtime broadcasts for the curriculum table so open browsers refresh automatically.
+-- Enable realtime broadcasts for the books table so open browsers refresh automatically.
 do $$
 begin
-  alter publication supabase_realtime add table public.curriculum;
+  alter publication supabase_realtime add table public.books;
 exception
   when duplicate_object then null;
 end $$;
 
--- Storage setup for cover/file uploads used by the app.
--- You may create this bucket in the dashboard instead:
+-- Storage setup for cover uploads. You may create this bucket in the dashboard instead:
 -- Storage > New bucket > Name: book-shelf > Public bucket: enabled.
 insert into storage.buckets (id, name, public)
 values ('book-shelf', 'book-shelf', true)
 on conflict (id) do update set public = excluded.public;
 
-drop policy if exists "Public read access for book shelf files" on storage.objects;
-create policy "Public read access for book shelf files"
+drop policy if exists "Public read access for book shelf covers" on storage.objects;
+create policy "Public read access for book shelf covers"
 on storage.objects
 for select
 to anon
 using (bucket_id = 'book-shelf');
 
-drop policy if exists "Anon upload access for book shelf files" on storage.objects;
-create policy "Anon upload access for book shelf files"
+drop policy if exists "Anon upload access for book shelf covers" on storage.objects;
+create policy "Anon upload access for book shelf covers"
 on storage.objects
 for insert
 to anon
 with check (bucket_id = 'book-shelf');
 
-drop policy if exists "Anon update access for book shelf files" on storage.objects;
-create policy "Anon update access for book shelf files"
+drop policy if exists "Anon update access for book shelf covers" on storage.objects;
+create policy "Anon update access for book shelf covers"
 on storage.objects
 for update
 to anon
