@@ -21,7 +21,6 @@ const LOCAL_BOOKS_CACHE_KEY = "apmf_bookshelf_db";
 let supabaseSyncEnabled = true;
 let booksRealtimeChannel = null;
 let coverInputMethod = "upload"; // EITHER "upload" OR "url"
-// Book records are loaded from Supabase; no hardcoded default bookshelf data is rendered.
 
 
 // 2. DOM Elements Cache
@@ -174,7 +173,7 @@ function bookFromSupabase(book) {
     return normalizeBookRecord(book);
 }
 
-function buildSupabasePayload(book, urlColumn = 'book_url') {
+function buildSupabasePayload(book, urlColumn = 'file_url') {
     return {
         id: book.id,
         title: book.title,
@@ -187,7 +186,7 @@ function buildSupabasePayload(book, urlColumn = 'book_url') {
 }
 
 function bookToSupabase(book) {
-    return buildSupabasePayload(book, 'book_url');
+    return buildSupabasePayload(book, 'file_url');
 }
 
 function getDisplayLabelForGrade(grade) {
@@ -199,7 +198,7 @@ async function tryPersistBookRecord(book, urlColumn) {
     const payload = buildSupabasePayload(book, urlColumn);
     const { error } = await supabaseClient
         .from(SUPABASE_BOOKS_TABLE)
-        .upsert(payload, { onConflict: 'id', returning: 'minimal' });
+        .upsert(payload, { onConflict: 'id' });
 
     if (error) throw error;
     return true;
@@ -262,53 +261,11 @@ async function persistBookRecord(book) {
     if (!supabaseSyncEnabled) return true;
 
     try {
-        return await tryPersistBookRecord(book, 'book_url');
+        return await tryPersistBookRecord(book, 'file_url');
     } catch (err) {
         const message = getSupabaseErrorMessage(err);
         console.error("Failed to save book metadata to Supabase.", err);
-
-        if (message.includes("Could not find the 'book_url' column") || message.includes('schema cache')) {
-            try {
-                await tryPersistBookRecord(book, 'onedrive_url');
-                showToast(
-                    "Metadata Sync Succeeded (Fallback)",
-                    "Saved metadata using legacy onedrive_url column. Please update your Supabase schema by rerunning `supabase/books_schema.sql`.",
-                    "success"
-                );
-                return true;
-            } catch (legacyErr) {
-                const legacyMessage = getSupabaseErrorMessage(legacyErr);
-                if (legacyMessage.includes("Could not find the 'onedrive_url' column") || legacyMessage.includes('schema cache')) {
-                    try {
-                        await tryPersistBookRecord(book, 'file_url');
-                        showToast(
-                            "Metadata Sync Succeeded (Fallback)",
-                            "Saved metadata using legacy file_url column. Please update your Supabase schema by rerunning `supabase/books_schema.sql`.",
-                            "success"
-                        );
-                        return true;
-                    } catch (fileErr) {
-                        console.error("Legacy book_url fallback also failed.", fileErr);
-                        showToast(
-                            "Metadata Sync Failed",
-                            "Supabase schema is missing the book_url/onedrive_url/file_url column on public.books. Re-run `supabase/books_schema.sql` or add the missing column manually.",
-                            "error"
-                        );
-                        return false;
-                    }
-                }
-
-                console.error("Legacy onedrive_url fallback failed.", legacyErr);
-                showToast(
-                    "Metadata Sync Failed",
-                    `The cover uploaded, but Supabase metadata save failed: ${legacyMessage}`,
-                    "error"
-                );
-                return false;
-            }
-        }
-
-        showToast("Metadata Sync Failed", `The cover uploaded, but Supabase metadata save failed: ${message}`, "error");
+        showToast("Metadata Sync Failed", `Database error: ${message}`, "error");
         return false;
     }
 }
@@ -360,11 +317,6 @@ function toggleTheme() {
 }
 
 // 6. OneDrive Link Redirection Logic
-/**
- * Advanced Link Converter: Automatically converts OneDrive share links to high-performance direct streaming URLs
- * e.g., converts "https://1drv.ms/b/s!AnL2..." or "https://onedrive.live.com/redir?resid=..."
- * into raw direct resource links or clean embeds.
- */
 function formatOneDriveUrl(url) {
     if (!url) return '';
     url = url.trim();
@@ -377,8 +329,6 @@ function formatOneDriveUrl(url) {
     try {
         // Case 1: Short OneDrive links (e.g., https://1drv.ms/b/s!AnL2...)
         if (url.includes('1drv.ms')) {
-            // Short share URLs are encoded using Base64
-            // Formula: Take the URL -> convert to safe base64 -> prepend u! -> request root content from api.onedrive.com
             let cleanUrl = url.split('?')[0]; // Remove query strings
             let encodedStr = btoa(unescape(encodeURIComponent(cleanUrl)));
             let safeBase64 = encodedStr
@@ -389,10 +339,8 @@ function formatOneDriveUrl(url) {
         }
 
         // Case 2: Standard personal OneDrive sharing URL
-        // e.g., https://onedrive.live.com/redir?resid=XXX&authkey=YYY
         if (url.includes('onedrive.live.com')) {
             if (url.includes('resid=')) {
-                // Check if it is a view link, replace "/redir" or "/embed" with "/download"
                 let directUrl = url.replace('/redir', '/download').replace('/embed', '/download');
                 if (!directUrl.includes('download=1')) {
                     directUrl += directUrl.includes('?') ? '&download=1' : '?download=1';
@@ -454,7 +402,6 @@ function initializeEventListeners() {
     // Tab Navigation
     DOM.classTabs.forEach(tab => {
         tab.addEventListener('click', (e) => {
-            // Find class-tab element even if child span is clicked
             const tabBtn = e.target.closest('.class-tab');
             DOM.classTabs.forEach(t => t.classList.remove('active'));
             tabBtn.classList.add('active');
@@ -555,7 +502,6 @@ function initializeEventListeners() {
 // 8. Hash routing router helper
 function checkHashRouter() {
     if (window.location.hash === '#admin') {
-        // Trigger admin login
         openAdminLoginModal();
     }
 }
@@ -609,11 +555,9 @@ function renderBooksGrid(booksToRender) {
         card.className = 'book-card';
         card.id = `book-card-${book.id}`;
 
-        // Convert the OneDrive link to direct/embed dynamic link
         const rawOneDriveLink = book.bookUrl;
         const formattedOneDriveLink = formatOneDriveUrl(rawOneDriveLink);
 
-        // Math character symbol fallback selector based on class number
         const symbols = ['∑', '√', 'π', '∞', '∫', '∆', 'θ'];
         const classIndex = (parseInt(book.grade, 10) || 6) - 6;
         const mathSymbol = symbols[classIndex % symbols.length];
@@ -641,7 +585,6 @@ function renderBooksGrid(booksToRender) {
     });
 }
 
-// Cover image error handler: automatically generates a beautiful math geometric gradient fallback
 function handleCoverLoadError(imgEl, mathSymbol) {
     const parent = imgEl.parentElement;
     parent.innerHTML = `
@@ -668,10 +611,8 @@ function handleCoverLoadError(imgEl, mathSymbol) {
 
 // Calculate textbook totals per class dynamically
 function updateClassTabsCount() {
-    // 1. Total Count
     document.getElementById('count-all').textContent = books.length;
 
-    // 2. Grade-specific counts
     for (let c = 6; c <= 12; c++) {
         const countEl = document.getElementById(`count-${c}`);
         if (countEl) {
@@ -690,7 +631,6 @@ function openAdminLoginModal() {
 
 function closeAdminLoginModal() {
     DOM.adminLoginModal.style.display = 'none';
-    // Clear URL hashes safely
     if (window.location.hash === '#admin') {
         history.replaceState(null, null, ' ');
     }
@@ -734,23 +674,19 @@ function handleFormPreviewUpdate() {
     const classVal = DOM.bookClassSelect.value;
     const coverUrlVal = DOM.bookCoverUrl.value.trim();
 
-    // Update preview title
     DOM.previewTitleText.textContent = titleVal || "Book Title Preview";
 
-    // Update class badge
     if (classVal) {
-            DOM.previewClassBadge.textContent = getDisplayLabelForGrade(classVal);
+        DOM.previewClassBadge.textContent = getDisplayLabelForGrade(classVal);
     } else {
         DOM.previewClassBadge.textContent = "Class -";
         DOM.previewClassBadge.className = "badge";
     }
 
-    // Cover Image update preview
     if (coverUrlVal && coverUrlVal.startsWith("http")) {
         DOM.liveCoverPreview.src = coverUrlVal;
         DOM.liveCoverPreview.style.display = 'block';
 
-        // Hide form placeholder frame
         const placeholder = DOM.previewImageContainer.querySelector('.preview-placeholder');
         if (placeholder) placeholder.style.display = 'none';
     } else {
@@ -761,7 +697,6 @@ function handleFormPreviewUpdate() {
 function handlePreviewError() {
     DOM.liveCoverPreview.style.display = 'none';
 
-    // Check if placeholder exists already
     let placeholder = DOM.previewImageContainer.querySelector('.preview-placeholder');
     if (!placeholder) {
         placeholder = document.createElement('div');
@@ -785,7 +720,6 @@ function resetBookForm() {
     DOM.cancelEditBtn.style.display = 'none';
     DOM.selectedFileBanner.style.display = 'none';
     
-    // Default back to file upload mode
     coverInputMethod = 'upload';
     DOM.btnChoiceUpload.classList.add('active');
     DOM.btnChoiceUrl.classList.remove('active');
@@ -799,7 +733,7 @@ function resetBookForm() {
     DOM.previewClassBadge.className = "badge";
 }
 
-// CRUD: Add & Edit Book Entry Handler with Supabase Storage Integration
+// CRUD: Add & Edit Book Entry Handler
 async function handleBookFormSubmit(e) {
     e.preventDefault();
 
@@ -808,7 +742,6 @@ async function handleBookFormSubmit(e) {
     const mediumVal = DOM.bookMediumSelect.value;
     const onedriveUrlVal = DOM.bookOneDriveUrl.value.trim();
 
-    // Form verification check
     if (!titleVal || !classVal || !onedriveUrlVal) {
         showToast("Invalid Form", "Please fill in all required book entry inputs.", "error");
         return;
@@ -823,7 +756,6 @@ async function handleBookFormSubmit(e) {
             return;
         }
     } else {
-        // Upload File Choice
         const file = DOM.bookCoverFile.files[0];
         
         if (!file && !editingBookId) {
@@ -832,20 +764,16 @@ async function handleBookFormSubmit(e) {
         }
 
         if (file) {
-            // Show dynamic upload status
             DOM.saveBookBtn.disabled = true;
             DOM.saveBookBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading to Supabase...';
             
             try {
-                // Extract file extension and clean book name
                 const fileExtension = file.name.split('.').pop();
-                // Folder: Class[GradeClass] -> filename: [BookName].[extension]
                 const folderName = `Class${classVal}`;
                 const sanitizedFileName = titleVal.replace(/[^a-zA-Z0-9\s-_()]/g, '').trim().replace(/\s+/g, '-');
                 const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                 const storagePath = `${folderName}/${sanitizedFileName}-${uniqueSuffix}.${fileExtension}`;
                 
-                // Upload direct to Supabase Storage bucket. A unique filename prevents stale browser/CDN cache from hiding updates.
                 const { data, error } = await supabaseClient.storage
                     .from(SUPABASE_STORAGE_BUCKET)
                     .upload(storagePath, file, {
@@ -855,7 +783,6 @@ async function handleBookFormSubmit(e) {
                     
                 if (error) throw error;
                 
-                // Retrieve the uploaded public URL
                 const { data: publicUrlData } = supabaseClient.storage
                     .from(SUPABASE_STORAGE_BUCKET)
                     .getPublicUrl(storagePath);
@@ -870,7 +797,6 @@ async function handleBookFormSubmit(e) {
                 return;
             }
         } else if (editingBookId) {
-            // Keep existing cover URL if editing and no new file was chosen
             const existingBook = books.find(b => b.id === editingBookId);
             if (existingBook) {
                 finalCoverUrl = existingBook.coverUrl;
@@ -887,7 +813,10 @@ async function handleBookFormSubmit(e) {
             bookToSave = {
                 id: editingBookId,
                 title: titleVal,
-            grade: classVal,
+                grade: classVal,
+                medium: mediumVal,
+                coverUrl: finalCoverUrl,
+                bookUrl: onedriveUrlVal
             };
 
             const synced = await persistBookRecord(bookToSave);
@@ -918,11 +847,10 @@ async function handleBookFormSubmit(e) {
             return;
         }
 
-        books.unshift(bookToSave); // Prepend to beginning so it appears first
+        books.unshift(bookToSave);
         showToast("Book Added", `Successfully added new textbook to bookshelf: "${titleVal}"`, "success");
     }
 
-    // Save cache and refresh visible UI immediately; realtime keeps other browsers in sync.
     saveBooksDatabase();
     updateUi();
     renderAdminBooksList();
@@ -941,13 +869,12 @@ function triggerEditBook(id) {
     DOM.bookClassSelect.value = book.grade;
     DOM.bookMediumSelect.value = book.medium;
     
-    // Default edit mode to URL tab to display current URL
     coverInputMethod = 'url';
     DOM.btnChoiceUrl.classList.add('active');
     DOM.btnChoiceUpload.classList.remove('active');
     DOM.coverUrlWrapper.style.display = 'block';
     DOM.coverUploadWrapper.style.display = 'none';
-    DOM.bookCoverUrl.required = false; // Allow upload tab override during edit
+    DOM.bookCoverUrl.required = false;
     DOM.bookCoverUrl.value = book.coverUrl;
     DOM.bookOneDriveUrl.value = book.bookUrl;
 
@@ -956,10 +883,8 @@ function triggerEditBook(id) {
     DOM.cancelEditBtn.style.display = 'block';
     DOM.selectedFileBanner.style.display = 'none';
 
-    // Update live previews
     handleFormPreviewUpdate();
 
-    // Jump form scroll top for fast mobile edits
     document.querySelector('.admin-form-column').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -975,7 +900,6 @@ async function triggerDeleteBook(id, title) {
         updateUi();
         renderAdminBooksList();
 
-        // If we are currently editing the deleted book, reset form
         if (editingBookId === id) {
             resetBookForm();
         }
@@ -984,7 +908,7 @@ async function triggerDeleteBook(id, title) {
     }
 }
 
-// Render dynamic rows in admin dashboard book list table
+// Render rows in dashboard list
 function renderAdminBooksList(filterStr = "") {
     DOM.adminBooksListRows.innerHTML = '';
 
@@ -1034,7 +958,6 @@ function showToast(title, message, type = "success") {
     DOM.toastTitle.textContent = title;
     DOM.toastMessage.textContent = message;
 
-    // Style toggle type classes
     if (type === "error") {
         DOM.toastNotification.classList.add('toast-error');
         DOM.toastIconHolder.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
