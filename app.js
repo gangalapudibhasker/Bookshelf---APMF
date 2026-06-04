@@ -14,123 +14,15 @@ let isAdminAuthenticated = false;
 const SUPABASE_URL = "https://uelnmcbwicwheancmgcu.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVlbG5tY2J3aWN3aGVhbmNtZ2N1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDA4ODgsImV4cCI6MjA5NDM3Njg4OH0.IQ8YFiofOeW0Vs_FI_w01pKf56YNe8qorJXa__7RR4I";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_BOOKS_TABLE = "books";
+const SUPABASE_STORAGE_BUCKET = "book-shelf";
+const LOCAL_BOOKS_CACHE_KEY = "apmf_bookshelf_db";
 
+let supabaseSyncEnabled = true;
+let booksRealtimeChannel = null;
 let coverInputMethod = "upload"; // EITHER "upload" OR "url"
-// Realistic Andhra Pradesh Math textbooks data loaded if LocalStorage is empty
-const INITIAL_BOOKS = [
-    {
-        id: "book-1",
-        title: "Class 6 Mathematics SCERT (English Medium)",
-        gradeClass: "6",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21102&authkey=AHx39NmsB6W8u1I"
-    },
-    {
-        id: "book-2",
-        title: "Class 6 Ganitham SCERT (Telugu Medium)",
-        gradeClass: "6",
-        medium: "Telugu",
-        coverUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21103&authkey=AIp9_KmsC8X9u2J"
-    },
-    {
-        id: "book-3",
-        title: "Class 7 Mathematics SCERT (English Medium)",
-        gradeClass: "7",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21104&authkey=AJz09NmsD9W0u3K"
-    },
-    {
-        id: "book-4",
-        title: "Class 7 Ganitham SCERT (Telugu Medium)",
-        gradeClass: "7",
-        medium: "Telugu",
-        coverUrl: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21105&authkey=AKq0_LmsE0Y0u4L"
-    },
-    {
-        id: "book-5",
-        title: "Class 8 Mathematics SCERT (English Medium)",
-        gradeClass: "8",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21106&authkey=ALr1_MmsF1Z1u5M"
-    },
-    {
-        id: "book-6",
-        title: "Class 8 Ganitham SCERT (Telugu Medium)",
-        gradeClass: "8",
-        medium: "Telugu",
-        coverUrl: "https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21107&authkey=AMs2_NmsG2a2u6N"
-    },
-    {
-        id: "book-7",
-        title: "Class 9 Mathematics SCERT (English Medium)",
-        gradeClass: "9",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1453733190148-c44698c265f8?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21108&authkey=ANt3_OmsH3b3u7O"
-    },
-    {
-        id: "book-8",
-        title: "Class 9 Ganitham SCERT (Telugu Medium)",
-        gradeClass: "9",
-        medium: "Telugu",
-        coverUrl: "https://images.unsplash.com/photo-1453733190148-c44698c265f8?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21109&authkey=AOu4_PmsI4c4u8P"
-    },
-    {
-        id: "book-9",
-        title: "Class 10 SCERT Mathematics Textbook (English Medium)",
-        gradeClass: "10",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21110&authkey=APv5_QmsJ5d5u9Q"
-    },
-    {
-        id: "book-10",
-        title: "Class 10 SCERT Ganitham Padhyapusthakam (Telugu Medium)",
-        gradeClass: "10",
-        medium: "Telugu",
-        coverUrl: "https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21111&authkey=AQw6_RmsK6e6u0R"
-    },
-    {
-        id: "book-11",
-        title: "Intermediate Math Class 11 - Paper IA (Algebra & Trigonometry)",
-        gradeClass: "11",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21112&authkey=ARx7_SmsL7f7u1S"
-    },
-    {
-        id: "book-12",
-        title: "Intermediate Math Class 11 - Paper IB (Calculus & Coordinate Geometry)",
-        gradeClass: "11",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21113&authkey=ASy8_TmsM8g8u2T"
-    },
-    {
-        id: "book-13",
-        title: "Intermediate Math Class 12 - Paper IIA (Complex Numbers & Probability)",
-        gradeClass: "12",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848c?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21114&authkey=ATz9_UmsN9h9u3U"
-    },
-    {
-        id: "book-14",
-        title: "Intermediate Math Class 12 - Paper IIB (Integration & Coordinate Geometry II)",
-        gradeClass: "12",
-        medium: "English",
-        coverUrl: "https://images.unsplash.com/photo-1509228627152-72ae9ae6848c?auto=format&fit=crop&q=80&w=400",
-        bookUrl: "https://onedrive.live.com/embed?cid=9C6E1E4F98E2A7CD&resid=9C6E1E4F98E2A7CD%21115&authkey=AUa0_VmsO0i0u4V"
-    }
-];
+// Book records are loaded from Supabase; no hardcoded default bookshelf data is rendered.
+
 
 // 2. DOM Elements Cache
 const DOM = {
@@ -199,33 +91,300 @@ const DOM = {
 };
 
 // 3. Application Initialization
-document.addEventListener('DOMContentLoaded', () => {
-    loadBooksDatabase();
+document.addEventListener('DOMContentLoaded', async () => {
     setupTheme();
     initializeEventListeners();
+    await loadBooksDatabase();
+    setupBooksRealtimeSync();
     updateUi();
 });
 
-// 4. Load Data from LocalStorage
-function loadBooksDatabase() {
-    const savedBooks = localStorage.getItem('apmf_bookshelf_db');
-    if (savedBooks) {
-        try {
-            books = JSON.parse(savedBooks);
-        } catch (e) {
-            console.error("Failed to parse local storage book records. Loading defaults.", e);
-            books = [...INITIAL_BOOKS];
-            saveBooksDatabase();
-        }
-    } else {
-        // First run initialization
-        books = [...INITIAL_BOOKS];
+// 4. Load Data from Supabase with LocalStorage fallback
+async function loadBooksDatabase() {
+    books = [];
+    updateUi();
+
+    if (!supabaseClient) {
+        supabaseSyncEnabled = false;
+        books = loadBooksFromLocalCache();
+        updateUi();
+        console.warn("Supabase client is unavailable. Using local browser cache only.");
+        return;
+    }
+
+    try {
+        books = await fetchBooksFromSupabase();
         saveBooksDatabase();
+    } catch (err) {
+        supabaseSyncEnabled = false;
+        console.error("Supabase books table could not be loaded. Trying to display files directly from Supabase Storage.", err);
+
+        try {
+            books = await fetchBooksFromSupabaseStorage();
+            saveBooksDatabase();
+        } catch (storageErr) {
+            books = loadBooksFromLocalCache();
+            console.error("Supabase Storage could not be listed. Showing cached records only; hardcoded demo data will not be used.", storageErr);
+        }
+    }
+}
+
+function loadBooksFromLocalCache() {
+    const savedBooks = localStorage.getItem(LOCAL_BOOKS_CACHE_KEY);
+    if (!savedBooks) return [];
+
+    try {
+        const parsedBooks = JSON.parse(savedBooks);
+        return Array.isArray(parsedBooks)
+            ? parsedBooks.map(normalizeBookRecord).filter(isDisplayableBookRecord).filter(book => !isLegacyDemoBookRecord(book))
+            : [];
+    } catch (e) {
+        console.error("Failed to parse local storage book records. Ignoring cached records.", e);
+        return [];
     }
 }
 
 function saveBooksDatabase() {
-    localStorage.setItem('apmf_bookshelf_db', JSON.stringify(books));
+    localStorage.setItem(LOCAL_BOOKS_CACHE_KEY, JSON.stringify(books));
+}
+
+function normalizeBookRecord(book) {
+    const title = book.title || "Untitled Book";
+    const gradeClass = normalizeGradeClass(book.gradeClass || book.grade_class || book.class || book.grade || book.class_level || book.theme || book.genre || title || book.description);
+    const medium = book.medium || book.author || book.subject || "English";
+    const coverUrl = book.coverUrl || book.cover_url || book.cover_image || book.cover || book.image_url || createPlaceholderCover(title, gradeClass);
+    const bookUrl = book.bookUrl || book.book_url || book.file_attachment || book.onedrive_url || book.file_url || book.url || '#';
+
+    return {
+        id: book.id,
+        title,
+        gradeClass,
+        medium,
+        coverUrl,
+        bookUrl,
+        createdAt: book.createdAt || book.created_at || null,
+        updatedAt: book.updatedAt || book.updated_at || null
+    };
+}
+
+function normalizeGradeClass(value) {
+    const classMatch = String(value || '').match(/(?:class|grade|level)?\s*(6|7|8|9|10|11|12)\b/i);
+    return classMatch ? classMatch[1] : '10';
+}
+
+function createPlaceholderCover(title, gradeClass) {
+    const shortTitle = encodeURIComponent(title.slice(0, 28));
+    return `https://via.placeholder.com/400x560/1e1b4b/a5b4fc?text=Class+${gradeClass}+Math%0A${shortTitle}`;
+}
+
+function isDisplayableBookRecord(book) {
+    return Boolean(book.id && book.title && book.gradeClass);
+}
+
+function isLegacyDemoBookRecord(book) {
+    return /^book-([1-9]|1[0-4])$/.test(book.id || '')
+        && (book.bookUrl || '').includes('9C6E1E4F98E2A7CD');
+}
+
+function sortBooksNewestFirst(a, b) {
+    const bTime = new Date(b.createdAt || b.updatedAt || 0).getTime();
+    const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();
+    return bTime - aTime;
+}
+
+function bookFromSupabase(book) {
+    return normalizeBookRecord(book);
+}
+
+function bookToSupabase(book) {
+    return {
+        id: book.id,
+        title: book.title,
+        author: book.medium || 'APMF',
+        cover_image: book.coverUrl,
+        file_attachment: book.bookUrl,
+        file_name: `${book.title}.pdf`,
+        color: '#1e3a8a',
+        accent_color: '#60a5fa',
+        genre: 'Mathematics',
+        year: new Date().getFullYear(),
+        description: `${book.title} - Class ${book.gradeClass} ${book.medium || 'English'} Medium mathematics resource.`,
+        theme: `Class ${book.gradeClass}`,
+        updated_at: new Date().toISOString()
+    };
+}
+
+async function fetchBooksFromSupabase() {
+    const { data, error } = await supabaseClient
+        .from(SUPABASE_BOOKS_TABLE)
+        .select('*');
+
+    if (error) throw error;
+
+    const tableBooks = (data || [])
+        .map(bookFromSupabase)
+        .filter(isDisplayableBookRecord)
+        .filter(book => !isLegacyDemoBookRecord(book));
+
+    const storageBooks = await fetchBooksFromSupabaseStorage().catch(err => {
+        console.warn("Supabase Storage list skipped; displaying table rows only.", err);
+        return [];
+    });
+
+    return mergeBookSources(tableBooks, storageBooks).sort(sortBooksNewestFirst);
+}
+
+async function fetchBooksFromSupabaseStorage() {
+    const storageBooks = await listStorageBooksRecursive('', 0);
+    return storageBooks
+        .filter(isDisplayableBookRecord)
+        .filter(book => !isLegacyDemoBookRecord(book));
+}
+
+async function listStorageBooksRecursive(pathPrefix = '', depth = 0) {
+    if (depth > 4) return [];
+
+    const { data, error } = await supabaseClient.storage
+        .from(SUPABASE_STORAGE_BUCKET)
+        .list(pathPrefix, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+
+    if (error) throw error;
+
+    const records = [];
+
+    for (const item of data || []) {
+        const itemPath = pathPrefix ? `${pathPrefix}/${item.name}` : item.name;
+        const isFolder = !item.id && !item.metadata?.mimetype && !item.name.includes('.');
+
+        if (isFolder) {
+            records.push(...await listStorageBooksRecursive(itemPath, depth + 1));
+            continue;
+        }
+
+        records.push(storageObjectToBook(itemPath, item));
+    }
+
+    return records;
+}
+
+function storageObjectToBook(storagePath, item) {
+    const { data: publicUrlData } = supabaseClient.storage
+        .from(SUPABASE_STORAGE_BUCKET)
+        .getPublicUrl(storagePath);
+
+    const publicUrl = publicUrlData.publicUrl;
+    const isImage = /\.(png|jpe?g|webp|gif|avif)$/i.test(storagePath);
+    const title = humanizeStorageFileName(item.name);
+    const gradeClass = normalizeGradeClass(storagePath);
+
+    return {
+        id: `storage-${storagePath.replace(/[^a-zA-Z0-9]/g, '-')}`,
+        title,
+        gradeClass,
+        medium: 'Supabase Storage',
+        coverUrl: isImage ? publicUrl : createPlaceholderCover(title, gradeClass),
+        bookUrl: publicUrl,
+        createdAt: item.created_at || item.updated_at || null,
+        updatedAt: item.updated_at || item.created_at || null
+    };
+}
+
+function humanizeStorageFileName(fileName) {
+    return fileName
+        .replace(/\.[^.]+$/, '')
+        .replace(/-\d{10,}(?:-[a-z0-9]+)?$/i, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || 'Supabase File';
+}
+
+function mergeBookSources(tableBooks, storageBooks) {
+    const merged = new Map();
+
+    storageBooks.forEach(book => merged.set(book.id, book));
+    tableBooks.forEach(book => {
+        const bookCoverUrl = normalizeUrlForComparison(book.coverUrl);
+        const bookFileUrl = normalizeUrlForComparison(book.bookUrl);
+        const storageMatch = storageBooks.find(storageBook => (
+            normalizeUrlForComparison(storageBook.coverUrl) === bookCoverUrl
+            || normalizeUrlForComparison(storageBook.bookUrl) === bookFileUrl
+        ));
+        merged.set(storageMatch?.id || book.id, book);
+    });
+
+    return Array.from(merged.values());
+}
+
+function normalizeUrlForComparison(url) {
+    return String(url || '').split('?')[0];
+}
+
+function setupBooksRealtimeSync() {
+    if (!supabaseSyncEnabled || booksRealtimeChannel) return;
+
+    booksRealtimeChannel = supabaseClient
+        .channel('public-books-sync')
+        .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: SUPABASE_BOOKS_TABLE },
+            async () => {
+                await refreshBooksFromSupabase();
+            }
+        )
+        .subscribe((status, err) => {
+            if (err) {
+                console.error("Supabase realtime subscription failed.", err);
+            }
+            console.info(`Books realtime sync status: ${status}`);
+        });
+}
+
+async function refreshBooksFromSupabase() {
+    if (!supabaseSyncEnabled) return;
+
+    try {
+        books = await fetchBooksFromSupabase();
+        saveBooksDatabase();
+        updateUi();
+        renderAdminBooksList();
+    } catch (err) {
+        console.error("Failed to refresh books from Supabase.", err);
+    }
+}
+
+async function persistBookRecord(book) {
+    if (!supabaseSyncEnabled) return true;
+
+    try {
+        const { error } = await supabaseClient
+            .from(SUPABASE_BOOKS_TABLE)
+            .upsert(bookToSupabase(book), { onConflict: 'id' });
+
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Failed to save book metadata to Supabase. The UI will still show this upload from local cache/storage listing.", err);
+        showToast("Upload Saved", "The file uploaded and is visible in this browser. To sync it across devices, run supabase/books_schema.sql so the books table allows metadata writes.", "success");
+        return false;
+    }
+}
+
+async function deleteBookRecordFromSupabase(id) {
+    if (!supabaseSyncEnabled) return true;
+
+    try {
+        const { error } = await supabaseClient
+            .from(SUPABASE_BOOKS_TABLE)
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Failed to delete book metadata from Supabase.", err);
+        showToast("Delete Sync Failed", "The local row was removed, but Supabase could not be updated. Check the books table/RLS policies.", "error");
+        return false;
+    }
 }
 
 // 5. Theme Settings (Light/Dark mode)
@@ -737,12 +896,13 @@ async function handleBookFormSubmit(e) {
                 const fileExtension = file.name.split('.').pop();
                 // Folder: Class[GradeClass] -> filename: [BookName].[extension]
                 const folderName = `Class${classVal}`;
-                const sanitizedFileName = titleVal.replace(/[^a-zA-Z0-9\s-_()]/g, '');
-                const storagePath = `${folderName}/${sanitizedFileName}.${fileExtension}`;
+                const sanitizedFileName = titleVal.replace(/[^a-zA-Z0-9\s-_()]/g, '').trim().replace(/\s+/g, '-');
+                const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                const storagePath = `${folderName}/${sanitizedFileName}-${uniqueSuffix}.${fileExtension}`;
                 
-                // Upload direct to Supabase Storage bucket 'book-shelf'
+                // Upload direct to Supabase Storage bucket. A unique filename prevents stale browser/CDN cache from hiding updates.
                 const { data, error } = await supabaseClient.storage
-                    .from('book-shelf')
+                    .from(SUPABASE_STORAGE_BUCKET)
                     .upload(storagePath, file, {
                         cacheControl: '3600',
                         upsert: true
@@ -752,10 +912,10 @@ async function handleBookFormSubmit(e) {
                 
                 // Retrieve the uploaded public URL
                 const { data: publicUrlData } = supabaseClient.storage
-                    .from('book-shelf')
+                    .from(SUPABASE_STORAGE_BUCKET)
                     .getPublicUrl(storagePath);
                     
-                finalCoverUrl = publicUrlData.publicUrl;
+                finalCoverUrl = `${publicUrlData.publicUrl}?v=${Date.now()}`;
                 showToast("Upload Success", "Cover image uploaded successfully to Supabase storage!", "success");
             } catch (err) {
                 console.error("Supabase Upload Error:", err);
@@ -773,11 +933,13 @@ async function handleBookFormSubmit(e) {
         }
     }
 
+    let bookToSave;
+
     if (editingBookId) {
         // EDIT MODE UPDATE
         const idx = books.findIndex(b => b.id === editingBookId);
         if (idx !== -1) {
-            books[idx] = {
+            bookToSave = {
                 id: editingBookId,
                 title: titleVal,
                 gradeClass: classVal,
@@ -785,11 +947,15 @@ async function handleBookFormSubmit(e) {
                 coverUrl: finalCoverUrl,
                 bookUrl: onedriveUrlVal
             };
+
+            await persistBookRecord(bookToSave);
+
+            books[idx] = bookToSave;
             showToast("Book Updated", `Successfully modified textbook: "${titleVal}"`, "success");
         }
     } else {
         // NEW BOOK ADDITION
-        const newBook = {
+        bookToSave = {
             id: `book-${Date.now()}`,
             title: titleVal,
             gradeClass: classVal,
@@ -797,11 +963,14 @@ async function handleBookFormSubmit(e) {
             coverUrl: finalCoverUrl,
             bookUrl: onedriveUrlVal
         };
-        books.unshift(newBook); // Prepend to beginning so it appears first
+
+        await persistBookRecord(bookToSave);
+
+        books.unshift(bookToSave); // Prepend to beginning so it appears first
         showToast("Book Added", `Successfully added new textbook to bookshelf: "${titleVal}"`, "success");
     }
 
-    // Save database and refresh
+    // Save cache and refresh visible UI immediately; realtime keeps other browsers in sync.
     saveBooksDatabase();
     updateUi();
     renderAdminBooksList();
@@ -843,8 +1012,11 @@ function triggerEditBook(id) {
 }
 
 // CRUD: DELETE Book Handler
-function triggerDeleteBook(id, title) {
+async function triggerDeleteBook(id, title) {
     if (confirm(`Are you absolutely sure you want to delete "${title}" textbook records?`)) {
+        const synced = await deleteBookRecordFromSupabase(id);
+        if (!synced && supabaseSyncEnabled) return;
+
         books = books.filter(b => b.id !== id);
         saveBooksDatabase();
 
