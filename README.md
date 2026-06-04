@@ -58,7 +58,7 @@ This project has zero build dependencies or Node.js runtime needs, making it com
 ## 📁 File Structure
 - `index.html` — Core HTML5 frame, search system, and modal structures.
 - `styles.css` — Responsive design tokens, styling rules, light/dark themes, and math SVG grids.
-- `app.js` — Core JavaScript logic (pre-populated textbooks, tab filters, OneDrive formatters, and admin CRUD logic).
+- `app.js` — Core JavaScript logic (Supabase curriculum sync, tab filters, OneDrive formatters, and admin CRUD logic).
 - `logo.png` — (Optional) Place your small custom logo here to override the SVG fallback.
 
 ---
