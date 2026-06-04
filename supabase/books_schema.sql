@@ -3,10 +3,12 @@
 -- Do not paste the file path `supabase/books_schema.sql`; that text is not SQL.
 -- Run this script before relying on cross-device syncing.
 
-create table if not exists public.books (
+drop table if exists public.books;
+
+create table public.books (
   id text primary key,
   title text not null,
-  grade_class text not null check (grade_class in ('6', '7', '8', '9', '10', '11', '12')),
+  grade_class text not null check (grade_class in ('6', '7', '8', '9', '10', '11', '12', 'NMMS', 'Other')),
   medium text not null default 'English',
   cover_url text not null,
   book_url text not null,
@@ -14,32 +16,8 @@ create table if not exists public.books (
   updated_at timestamptz not null default now()
 );
 
--- Ensure older tables created before these columns existed are upgraded safely.
-alter table public.books
-  add column if not exists cover_url text not null default '';
-alter table public.books
-  add column if not exists book_url text not null default '';
-
-do $$
-begin
-  if exists (
-    select 1 from information_schema.columns
-      where table_schema = 'public' and table_name = 'books' and column_name = 'onedrive_url'
-  ) then
-    update public.books
-    set book_url = onedrive_url
-    where (book_url is null or book_url = '') and onedrive_url is not null;
-  end if;
-
-  if exists (
-    select 1 from information_schema.columns
-      where table_schema = 'public' and table_name = 'books' and column_name = 'file_url'
-  ) then
-    update public.books
-    set book_url = file_url
-    where (book_url is null or book_url = '') and file_url is not null;
-  end if;
-end $$;
+-- This schema allows all future book categories to be stored in grade_class,
+-- including NMMS and Other, while preserving the existing numeric class values.
 
 alter table public.books enable row level security;
 

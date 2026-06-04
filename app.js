@@ -190,6 +190,19 @@ function bookToSupabase(book) {
     return buildSupabasePayload(book, 'book_url');
 }
 
+function getDisplayLabelForGrade(gradeClass) {
+    if (!gradeClass) return '';
+    const normalized = gradeClass.toString();
+    if (['NMMS', 'Other'].includes(normalized)) {
+        return normalized;
+    }
+    return `Class ${normalized}`;
+}
+
+function isNumericGrade(gradeClass) {
+    return !Number.isNaN(Number.parseInt(gradeClass, 10));
+}
+
 async function tryPersistBookRecord(book, urlColumn) {
     const payload = buildSupabasePayload(book, urlColumn);
     const { error } = await supabaseClient
@@ -576,7 +589,9 @@ function updateUi() {
     updateClassTabsCount();
 
     // 4. Update Header Indicator
-    const sectionName = activeClassFilter === 'all' ? 'All Classes' : `Class ${activeClassFilter}`;
+const sectionName = activeClassFilter === 'all'
+            ? 'All Books'
+            : getDisplayLabelForGrade(activeClassFilter);
     DOM.currentSectionTitle.textContent = `${sectionName} Mathematics Textbooks`;
 
     if (currentSearchQuery) {
@@ -610,8 +625,18 @@ function renderBooksGrid(booksToRender) {
 
         // Math character symbol fallback selector based on class number
         const symbols = ['∑', '√', 'π', '∞', '∫', '∆', 'θ'];
-        const classIndex = (parseInt(book.gradeClass) || 6) - 6;
-        const mathSymbol = symbols[classIndex % symbols.length];
+        const gradeValue = book.gradeClass || '';
+        let classIndex;
+        if (isNumericGrade(gradeValue)) {
+            classIndex = parseInt(gradeValue, 10) - 6;
+        } else if (gradeValue === 'NMMS') {
+            classIndex = 7;
+        } else if (gradeValue === 'Other') {
+            classIndex = 8;
+        } else {
+            classIndex = 6;
+        }
+        const mathSymbol = symbols[((classIndex % symbols.length) + symbols.length) % symbols.length];
 
         card.innerHTML = `
             <div class="card-cover-wrapper">
@@ -620,7 +645,7 @@ function renderBooksGrid(booksToRender) {
             </div>
             <div class="card-details">
                 <div class="card-meta">
-                    <span class="badge badge-class">Class ${book.gradeClass}</span>
+                    <span class="badge badge-class">${getDisplayLabelForGrade(book.gradeClass)}</span>
                     <span class="badge badge-medium">${book.medium} Medium</span>
                 </div>
                 <h4 class="card-title" title="${book.title}">${book.title}</h4>
@@ -666,11 +691,14 @@ function updateClassTabsCount() {
     // 1. Total Count
     document.getElementById('count-all').textContent = books.length;
 
-    // 2. Class-specific counts
-    for (let c = 6; c <= 12; c++) {
-        const classCount = books.filter(book => book.gradeClass === c.toString()).length;
-        document.getElementById(`count-${c}`).textContent = classCount;
-    }
+    // 2. Class/category-specific counts
+    const countGroups = ['6', '7', '8', '9', '10', '11', '12', 'NMMS', 'Other'];
+    countGroups.forEach(group => {
+        const countEl = document.getElementById(`count-${group}`);
+        if (countEl) {
+            countEl.textContent = books.filter(book => book.gradeClass === group).length;
+        }
+    });
 }
 
 // 10. Admin Authentication Modal Controls
@@ -732,8 +760,7 @@ function handleFormPreviewUpdate() {
 
     // Update class badge
     if (classVal) {
-        DOM.previewClassBadge.textContent = `Class ${classVal}`;
-        DOM.previewClassBadge.className = "badge badge-class";
+            DOM.previewClassBadge.textContent = getDisplayLabelForGrade(classVal);
     } else {
         DOM.previewClassBadge.textContent = "Class -";
         DOM.previewClassBadge.className = "badge";
@@ -1006,7 +1033,7 @@ function renderAdminBooksList(filterStr = "") {
             <td>
                 <div class="admin-book-title-cell" title="${book.title}">${book.title}</div>
             </td>
-            <td><span class="badge badge-class">Class ${book.gradeClass}</span></td>
+            <td><span class="badge badge-class">${getDisplayLabelForGrade(book.gradeClass)}</span></td>
             <td><span class="badge badge-medium">${book.medium}</span></td>
             <td>
                 <div class="admin-row-actions">
